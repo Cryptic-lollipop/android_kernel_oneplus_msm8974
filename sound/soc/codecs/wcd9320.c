@@ -461,12 +461,14 @@ struct taiko_priv {
 	 * end of impedance measurement
 	 */
 	struct list_head reg_save_restore;
+
 	struct pm_qos_request pm_qos_req;
-	/* cal info for codec */
-	struct fw_info *fw_data;
 
 	/* UHQA (class AB) mode */
 	u8 uhqa_mode;
+
+	/* cal info for codec */
+	struct fw_info *fw_data;
 };
 
 static const u32 comp_shift[] = {
@@ -2951,8 +2953,8 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 	const void *data;
 	const char *filename = TAIKO_MAD_AUDIO_FIRMWARE_PATH;
 	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
-	size_t cal_size;
 	int i = 0;
+	size_t cal_size;
 
 	pr_debug("%s: enter\n", __func__);
 	/* wakeup for codec calibration access */
@@ -3176,7 +3178,7 @@ static int taiko_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMU:
-		usleep_range(5000, 5100);
+		usleep_range(20000, 20000);
 		/* Let MBHC module know so micbias is on */
 		wcd9xxx_resmgr_notifier_call(&taiko->resmgr, e_post_on);
 		break;
@@ -6787,7 +6789,7 @@ static const struct wcd9xxx_reg_mask_val taiko_reg_defaults[] = {
 	TAIKO_REG_VAL(TAIKO_A_CDC_CONN_MAD, 0x01),
 
 	/* Set HPH Path to low power mode */
-	TAIKO_REG_VAL(TAIKO_A_RX_HPH_BIAS_PA, 0x57),
+	TAIKO_REG_VAL(TAIKO_A_RX_HPH_BIAS_PA, 0x55),
 
 	/* BUCK default */
 	TAIKO_REG_VAL(WCD9XXX_A_BUCK_CTRL_CCL_4, 0x51),
@@ -7322,8 +7324,8 @@ static const struct wcd9xxx_mbhc_cb mbhc_cb = {
 	.get_cdc_type = taiko_get_cdc_type,
 	.setup_zdet = taiko_setup_zdet,
 	.compute_impedance = taiko_compute_impedance,
-	.get_hwdep_fw_cal = taiko_get_hwdep_fw_cal,
 	.enable_hpmic_switch = taiko_enable_hpmic_switch,
+	.get_hwdep_fw_cal = taiko_get_hwdep_fw_cal,
 };
 
 static const struct wcd9xxx_mbhc_intr cdc_intr_ids = {
@@ -7608,7 +7610,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "%s hwdep failed %d\n", __func__, ret);
 		goto err_hwdep;
 	}
-
 	/* init and start mbhc */
 	ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 				taiko_enable_mbhc_micbias,

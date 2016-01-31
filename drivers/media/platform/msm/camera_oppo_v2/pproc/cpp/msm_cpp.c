@@ -178,12 +178,10 @@ static void msm_cpp_write(u32 data, void __iomem *cpp_base)
 
 static void msm_cpp_clear_timer(struct cpp_device *cpp_dev)
 {
-	if (atomic_read(&cpp_timer.used)) {
-		atomic_set(&cpp_timer.used, 0);
-		del_timer(&cpp_timer.cpp_timer);
-		cpp_timer.data.processed_frame = NULL;
-		cpp_dev->timeout_trial_cnt = 0;
-	}
+	atomic_set(&cpp_timer.used, 0);
+	del_timer(&cpp_timer.cpp_timer);
+	cpp_timer.data.processed_frame = NULL;
+	cpp_dev->timeout_trial_cnt = 0;
 }
 
 static uint32_t msm_cpp_read(void __iomem *cpp_base)
@@ -505,6 +503,7 @@ static int cpp_init_mem(struct cpp_device *cpp_dev)
 	int rc = 0;
 
 	kref_init(&cpp_dev->refcount);
+	kref_get(&cpp_dev->refcount);
 	cpp_dev->client = msm_ion_client_create(-1, "cpp");
 
 	CPP_DBG("E\n");
@@ -1230,7 +1229,6 @@ static int msm_cpp_send_frame_to_hardware(struct cpp_device *cpp_dev,
 		cpp_timer.data.processed_frame = process_frame;
 		atomic_set(&cpp_timer.used, 1);
 		/* install timer for cpp timeout */
-		init_timer(&cpp_timer.cpp_timer);
 		CPP_DBG("Installing cpp_timer\n");
 		setup_timer(&cpp_timer.cpp_timer,
 			cpp_timer_callback, (unsigned long)&cpp_timer);

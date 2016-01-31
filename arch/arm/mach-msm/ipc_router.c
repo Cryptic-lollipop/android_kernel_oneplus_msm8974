@@ -100,8 +100,6 @@ if (msm_ipc_router_debug_mask & R2R_RAW_HDR) \
 #define IPC_ROUTER_LOG_EVENT_RX         0x02
 #define IPC_ROUTER_DUMMY_DEST_NODE	0xFFFFFFFF
 
-#define ipc_port_sk(port) ((struct sock *)(port))
-
 static LIST_HEAD(control_ports);
 static DECLARE_RWSEM(control_ports_lock_lha5);
 
@@ -816,7 +814,7 @@ static int post_pkt_to_port(struct msm_ipc_port *port_ptr,
 	}
 
 	mutex_lock(&port_ptr->port_rx_q_lock_lhb3);
-	__pm_stay_awake(port_ptr->port_rx_ws);
+	__pm_stay_awake(&port_ptr->port_rx_ws);
 	list_add_tail(&temp_pkt->list, &port_ptr->port_rx_q);
 	wake_up(&port_ptr->port_rx_wait_q);
 	notify = port_ptr->notify;
@@ -915,19 +913,13 @@ struct msm_ipc_port *msm_ipc_router_create_raw_port(void *endpoint,
 		 "ipc%08x_%s",
 		 port_ptr->this_port.port_id,
 		 current->comm);
-	port_ptr->port_rx_ws = wakeup_source_register(port_ptr->rx_ws_name);
-	if (!port_ptr->port_rx_ws) {
-		kfree(port_ptr);
-		return NULL;
-	}
+	wakeup_source_init(&port_ptr->port_rx_ws, port_ptr->rx_ws_name);
 
 	port_ptr->endpoint = endpoint;
 	port_ptr->notify = notify;
 	port_ptr->priv = priv;
 
 	msm_ipc_router_add_local_port(port_ptr);
-	if (endpoint)
-		sock_hold(ipc_port_sk(endpoint));
 	return port_ptr;
 }
 
@@ -2606,7 +2598,7 @@ int msm_ipc_router_read(struct msm_ipc_port *port_ptr,
 	}
 	list_del(&pkt->list);
 	if (list_empty(&port_ptr->port_rx_q))
-		__pm_relax(port_ptr->port_rx_ws);
+		__pm_relax(&port_ptr->port_rx_ws);
 	*read_pkt = pkt;
 	mutex_unlock(&port_ptr->port_rx_q_lock_lhb3);
 	if (pkt->hdr.control_flag & CONTROL_FLAG_CONFIRM_RX)
@@ -2834,9 +2826,7 @@ int msm_ipc_router_close_port(struct msm_ipc_port *port_ptr)
 		up_write(&server_list_lock_lha2);
 	}
 
-	wakeup_source_unregister(port_ptr->port_rx_ws);
-	if (port_ptr->endpoint)
-		sock_put(ipc_port_sk(port_ptr->endpoint));
+	wakeup_source_trash(&port_ptr->port_rx_ws);
 	kfree(port_ptr);
 	return 0;
 }

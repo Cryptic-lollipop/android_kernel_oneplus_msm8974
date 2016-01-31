@@ -181,14 +181,14 @@ static int cpufreq_policy_notifier(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 
 	switch (event) {
-	case CPUFREQ_CREATE_POLICY:
+	case CPUFREQ_GOV_START:
 		mutex_lock(&state_lock);
 		add_policy(policy);
 		update_all_devfreqs();
 		mutex_unlock(&state_lock);
 		break;
 
-	case CPUFREQ_REMOVE_POLICY:
+	case CPUFREQ_GOV_STOP:
 		mutex_lock(&state_lock);
 		if (state[policy->cpu]) {
 			state[policy->cpu]->on = false;
@@ -667,6 +667,7 @@ static int __init devfreq_cpufreq_init(void)
 				pr_err("Parsing %s failed!\n", of_child->name);
 			else
 				pr_debug("Parsed %s.\n", of_child->name);
+			of_node_put(of_child);
 		}
 		of_node_put(of_par);
 	} else {

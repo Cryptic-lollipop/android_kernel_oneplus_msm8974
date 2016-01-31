@@ -398,6 +398,8 @@ extern unsigned long
 arch_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 			  unsigned long len, unsigned long pgoff,
 			  unsigned long flags);
+extern void arch_unmap_area(struct mm_struct *, unsigned long);
+extern void arch_unmap_area_topdown(struct mm_struct *, unsigned long);
 #else
 static inline void arch_pick_mmap_layout(struct mm_struct *mm) {}
 #endif
@@ -1360,7 +1362,6 @@ struct task_struct {
 	/* IRQ handler threads */
 	unsigned irq_thread:1;
 #endif
-
 	unsigned long atomic_flags; /* Flags needing atomic access. */
 
 	pid_t pid;
@@ -1875,6 +1876,7 @@ extern int task_free_unregister(struct notifier_block *n);
 #define used_math() tsk_used_math(current)
 
 /* Per-process atomic flags. */
+
 #define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
 
 static inline bool task_no_new_privs(struct task_struct *p)

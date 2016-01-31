@@ -62,8 +62,7 @@
 	android_usb@fe8050c8 {
 		compatible = "qcom,android-usb";
 		reg = <0xfe8050c8 0xc8>;
-		qcom,pm-qos-latency = <2 1001 30001>;
-		qcom,android-usb-uicc-nluns = /bits/ 8 <1>;
+		qcom,android-usb-swfi-latency = <1>;
 	};
 
 	qcom,msm-imem@fe805000 {
@@ -1662,48 +1661,41 @@
                        reg = <0>;
                        qcom,gpu-freq = <578000000>;
                        qcom,bus-freq = <13>;
-                       qcom,io-fraction = <101>;
                };
 
                qcom,gpu-pwrlevel@1 {
                        reg = <1>;
                        qcom,gpu-freq = <462400000>;
                        qcom,bus-freq = <10>;
-                       qcom,io-fraction = <101>;
                };
 
                qcom,gpu-pwrlevel@2 {
                        reg = <2>;
                        qcom,gpu-freq = <389000000>;
                        qcom,bus-freq = <7>;
-                       qcom,io-fraction = <101>;
                };
 
                qcom,gpu-pwrlevel@3 {
                        reg = <3>;
                        qcom,gpu-freq = <330000000>;
                        qcom,bus-freq = <4>;
-                       qcom,io-fraction = <101>;
                };
 
                qcom,gpu-pwrlevel@4 {
                        reg = <4>;
                        qcom,gpu-freq = <200000000>;
                        qcom,bus-freq = <1>;
-                       qcom,io-fraction = <101>;
                };
 
                qcom,gpu-pwrlevel@5 {
                        reg = <5>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
-                       qcom,io-fraction = <101>;
                };
        };
 };
 
 &mdss_mdp {
-	qcom,max-bandwidth-low-kbps = <2750000>;
 	qcom,vbif-settings = <0x0004 0x00000001>;
 
 	qcom,mdss-wb-off = <0x00011100 0x00011500
@@ -1714,6 +1706,20 @@
 	qcom,mdss-has-bwc;
 	qcom,mdss-has-decimation;
 	qcom,mdss-ad-off = <0x0013100 0x00013300>;
+	qcom,max-bandwidth-low-kbps = <2750000>;
+	qcom,mdp-settings = <0x000002E0 0x000000E9>,
+			    <0x000002E4 0x00000055>,
+			    <0x000003AC 0xC0000CCC>,
+			    <0x000003B4 0xC0000CCC>,
+			    <0x000003BC 0x00CCCCCC>,
+			    <0x000004A8 0x0CCCC0C0>,
+			    <0x000004B0 0xCCCCC0C0>,
+			    <0x000004B8 0xCCCCC000>,
+			    <0x00011148 0x00000058>,
+			    <0x00011548 0x00000058>,
+			    <0x00011948 0x00000058>,
+			    <0x00011D48 0x00000058>,
+			    <0x00012148 0x00000058>;
 	vdd-cx-supply = <&pm8841_s2_corner>;
 };
 
@@ -1808,8 +1814,4 @@
 
 	qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 192000000 384000000>;
 	qcom,bus-speed-mode = "HS400_1p8v", "HS200_1p8v", "DDR_1p8v";
-};
-
-&gdsc_venus {
-	qcom,skip-logic-collapse;
 };

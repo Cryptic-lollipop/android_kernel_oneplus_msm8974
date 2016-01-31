@@ -709,13 +709,19 @@ static void venus_hfi_unvote_buses(void *dev, enum mem_type mtype)
 	}
 }
 
+#define BUS_LOAD(__w, __h, __fps) (\
+	/* Something's fishy if the width & height aren't macroblock aligned */\
+	BUILD_BUG_ON_ZERO(!IS_ALIGNED(__h, 16) || !IS_ALIGNED(__w, 16)) ?: \
+	(__h >> 4) * (__w >> 4) * __fps)
+
 static const u32 venus_hfi_bus_table[] = {
-	36000,
-	110400,
-	244800,
-	489000,
-	783360,
-	979200,
+	BUS_LOAD(640, 480, 30),
+	BUS_LOAD(1280, 736, 30),
+	BUS_LOAD(1920, 1088, 30),
+	BUS_LOAD(1920, 1088, 60),
+	BUS_LOAD(3840, 2176, 24),
+	BUS_LOAD(4096, 2176, 24),
+	BUS_LOAD(3840, 2176, 30),
 };
 
 static int venus_hfi_get_bus_vector(struct venus_hfi_device *device, int load,
@@ -1074,6 +1080,8 @@ static int __unset_free_ocmem(struct venus_hfi_device *device)
 				__func__, device);
 		return -EINVAL;
 	}
+	if (!device->res->ocmem_size)
+		return rc;
 
 	if (!device->res->ocmem_size)
 		return rc;
@@ -3767,8 +3775,7 @@ static void venus_hfi_unload_fw(void *dev)
 		return;
 	}
 	if (device->resources.fw.cookie) {
-		if (device->state != VENUS_STATE_DEINIT)
-			flush_workqueue(device->vidc_workq);
+		flush_workqueue(device->vidc_workq);
 		flush_workqueue(device->venus_pm_workq);
 		subsystem_put(device->resources.fw.cookie);
 		venus_hfi_interface_queues_release(dev);

@@ -743,15 +743,12 @@ limCleanupRxPath(tpAniSirGlobal pMac, tpDphHashNode pStaDs,tpPESession psessionE
     pMac->lim.gLimNumRxCleanup++;
 #endif
 
-    /* Do DEL BSS or DEL STA only if ADD BSS was success */
-    if (!psessionEntry->addBssfailed)
-    {
-        if (psessionEntry->limSmeState == eLIM_SME_JOIN_FAILURE_STATE)
-           retCode = limDelBss( pMac, pStaDs,
-                          psessionEntry->bssIdx, psessionEntry);
-        else
-           retCode = limDelSta( pMac, pStaDs, true, psessionEntry);
+    if (psessionEntry->limSmeState == eLIM_SME_JOIN_FAILURE_STATE) {
+        retCode = limDelBss( pMac, pStaDs, psessionEntry->bssIdx, psessionEntry);
     }
+    else
+        retCode = limDelSta( pMac, pStaDs, true, psessionEntry);
+
     return retCode;
 
 } /*** end limCleanupRxPath() ***/

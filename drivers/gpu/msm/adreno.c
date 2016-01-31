@@ -30,6 +30,7 @@
 #include "kgsl_cffdump.h"
 #include "kgsl_sharedmem.h"
 #include "kgsl_iommu.h"
+#include "kgsl_trace.h"
 
 #include "adreno.h"
 #include "adreno_pm4types.h"
@@ -400,10 +401,14 @@ static int adreno_perfcounter_start(struct adreno_device *adreno_dev)
 					KGSL_PERFCOUNTER_BROKEN)
 				continue;
 
+			/*
+			 * The GPU has to be idle before calling the perfcounter
+			 * enable function, but since this function is called
+			 * during start we already know the GPU is idle
+			 */
 			if (adreno_dev->gpudev->perfcounter_enable)
-				ret = adreno_dev->gpudev->perfcounter_enable(
-					adreno_dev, i, j,
-					group->regs[j].countable);
+				ret = adreno_dev->gpudev->perfcounter_enable(adreno_dev, i,
+					j, group->regs[j].countable);
 				if (ret)
 					goto done;
 		}
@@ -630,6 +635,44 @@ static inline void refcount_group(struct adreno_perfcount_group *group,
 		*hi = group->regs[reg].offset_hi;
 }
 
+
+/**
+ * adreno_idle_unsafe() - wait for the GPU hardware to go idle
+ *
+ * This doesn't check for dispatcher mutex owner. Hence this function
+ * should be called only if we are sure that we dont own dispatcher mutex
+ * in this thread.
+ *
+ * @device: Pointer to the KGSL device structure for the GPU
+ *
+ * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ */
+
+static int adreno_idle_unsafe(struct kgsl_device *device)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	/*
+	 * Make sure the device mutex is held so the dispatcher can't send any
+	 * more commands to the hardware
+	 */
+
+	BUG_ON(!mutex_is_locked(&device->mutex));
+
+	/* Check if we are already idle before idling dispatcher */
+	if (adreno_isidle(device))
+		return 0;
+	/*
+	 * Wait for dispatcher to finish completing commands
+	 * already submitted
+	 */
+	ret = adreno_dispatcher_idle_unsafe(adreno_dev);
+	if (ret)
+		return ret;
+
+	return adreno_spin_idle(device);
+}
 /**
  * adreno_perfcounter_get: Try to put a countable in an available counter
  * @adreno_dev: Adreno device to configure
@@ -710,6 +753,11 @@ int adreno_perfcounter_get(struct adreno_device *adreno_dev,
 	/* no available counters, so do nothing else */
 	if (empty == -1)
 		return -EBUSY;
+
+	ret = adreno_idle_unsafe(&adreno_dev->dev);
+
+	if (ret)
+		return ret;
 
 	/* enable the new counter */
 	ret = adreno_dev->gpudev->perfcounter_enable(adreno_dev, groupid, empty,
@@ -801,6 +849,11 @@ int adreno_perfcounter_put(struct adreno_device *adreno_dev,
  */
 static inline void adreno_perfcounter_restore(struct adreno_device *adreno_dev)
 {
+	/*
+	 * The GPU needs to be idle before writing the perfcounter select
+	 * registers. Since this function gets called during start/resume we
+	 * know the GPU is already idle so we don't need to stop it
+	 */
 	if (adreno_dev->gpudev->perfcounter_restore)
 		adreno_dev->gpudev->perfcounter_restore(adreno_dev);
 }
@@ -1360,10 +1413,6 @@ static int adreno_of_get_pwrlevels(struct device_node *parent,
 		if (adreno_of_read_property(child, "qcom,bus-freq",
 			&level->bus_freq))
 			goto done;
-
-		if (adreno_of_read_property(child, "qcom,io-fraction",
-			&level->io_fraction))
-			level->io_fraction = 0;
 	}
 
 	if (adreno_of_read_property(parent, "qcom,initial-pwrlevel",
@@ -1497,12 +1546,6 @@ static int adreno_of_get_pdata(struct platform_device *pdev)
 	ret = adreno_of_get_pwrlevels(pdev->dev.of_node, pdata);
 	if (ret)
 		goto err;
-
-	/* get pm-qos-latency from target, set it to default if not found */
-	if (adreno_of_read_property(pdev->dev.of_node, "qcom,pm-qos-latency",
-		&pdata->pm_qos_latency))
-		pdata->pm_qos_latency = 501;
-
 
 	if (adreno_of_read_property(pdev->dev.of_node, "qcom,idle-timeout",
 		&pdata->idle_timeout))
@@ -1767,10 +1810,6 @@ static int adreno_init(struct kgsl_device *device)
 	for (i = 6; i < FT_DETECT_REGS_COUNT; i++)
 		ft_detect_regs[i] = 0;
 
-	/* turn on hang interrupt for a330v2 by default */
-	if (adreno_is_a330v2(adreno_dev))
-		set_bit(ADRENO_DEVICE_HANG_INTR, &adreno_dev->priv);
-
 	ret = adreno_perfcounter_init(device);
 	if (ret)
 		goto done;
@@ -1845,13 +1884,11 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_ON);
 	device->ftbl->irqctrl(device, 1);
 
+	adreno_perfcounter_start(adreno_dev);
+
 	status = adreno_ringbuffer_cold_start(&adreno_dev->ringbuffer);
 	if (status)
 		goto error_irq_off;
-
-	status = adreno_perfcounter_start(adreno_dev);
-	if (status)
-		goto error_rb_stop;
 
 	/* Start the dispatcher */
 	adreno_dispatcher_start(device);
@@ -1862,8 +1899,6 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 
 	return 0;
 
-error_rb_stop:
-	adreno_ringbuffer_stop(&adreno_dev->ringbuffer);
 error_irq_off:
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
 
@@ -2298,7 +2333,8 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 		switch (device->state) {
 		case KGSL_STATE_NAP:
 		case KGSL_STATE_SLEEP:
-			kgsl_pwrctrl_wake(device, 0);
+			kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_ON,
+					device->state);
 		case KGSL_STATE_ACTIVE:
 			adreno_dev->gpudev->irq_control(adreno_dev, 1);
 		/*
@@ -2504,15 +2540,32 @@ static int adreno_set_constraint(struct kgsl_device *device,
 		context->pwr_constraint.type =
 				KGSL_CONSTRAINT_PWRLEVEL;
 		context->pwr_constraint.sub_type = pwr.level;
+		trace_kgsl_user_pwrlevel_constraint(device,
+			context->id,
+			context->pwr_constraint.type,
+			context->pwr_constraint.sub_type);
 		}
 		break;
 	case KGSL_CONSTRAINT_NONE:
+		if (context->pwr_constraint.type == KGSL_CONSTRAINT_PWRLEVEL)
+			trace_kgsl_user_pwrlevel_constraint(device,
+				context->id,
+				KGSL_CONSTRAINT_NONE,
+				context->pwr_constraint.sub_type);
 		context->pwr_constraint.type = KGSL_CONSTRAINT_NONE;
 		break;
 
 	default:
 		status = -EINVAL;
 		break;
+	}
+
+	/* If a new constraint has been set for a context, cancel the old one */
+	if ((status == 0) &&
+		(context->id == device->pwrctrl.constraint.owner_id)) {
+		trace_kgsl_constraint(device, device->pwrctrl.constraint.type,
+					device->pwrctrl.active_pwrlevel, 0);
+		device->pwrctrl.constraint.type = KGSL_CONSTRAINT_NONE;
 	}
 
 	return status;
@@ -2609,17 +2662,17 @@ bool adreno_hw_isidle(struct kgsl_device *device)
 	unsigned int reg_rbbm_status;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 
+	adreno_readreg(adreno_dev, ADRENO_REG_RBBM_STATUS,
+		&reg_rbbm_status);
+
+	if (reg_rbbm_status & ~0x80000001)
+		return false;
+
 	/* Don't consider ourselves idle if there is an IRQ pending */
 	if (adreno_dev->gpudev->irq_pending(adreno_dev))
 		return false;
 
-	adreno_readreg(adreno_dev, ADRENO_REG_RBBM_STATUS,
-		&reg_rbbm_status);
-
-	if (!(reg_rbbm_status & 0x80000000))
-		return true;
-
-	return false;
+	return true;
 }
 
 /**
@@ -2725,32 +2778,19 @@ bool adreno_isidle(struct kgsl_device *device)
 }
 
 /**
- * adreno_idle() - wait for the GPU hardware to go idle
- * @device: Pointer to the KGSL device structure for the GPU
+ * adreno_spin_idle() - Spin wait for the GPU to idle
+ * @device: Pointer to the KGSL device
  *
- * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ * Spin the CPU waiting for the RBBM status to return idle
  */
-
-int adreno_idle(struct kgsl_device *device)
+int adreno_spin_idle(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	unsigned long wait = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
 
-	/*
-	 * Make sure the device mutex is held so the dispatcher can't send any
-	 * more commands to the hardware
-	 */
-
-	BUG_ON(!mutex_is_locked(&device->mutex));
-
-	if (adreno_is_a3xx(adreno_dev))
-		kgsl_cffdump_regpoll(device,
-			adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
-			0x00000000, 0x80000000);
-	else
-		kgsl_cffdump_regpoll(device,
-			adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
-			0x110, 0x110);
+	kgsl_cffdump_regpoll(device,
+		adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
+		0x00000000, 0x80000000);
 
 	while (time_before(jiffies, wait)) {
 		/*
@@ -2768,6 +2808,39 @@ int adreno_idle(struct kgsl_device *device)
 	}
 
 	return -ETIMEDOUT;
+}
+
+/**
+ * adreno_idle() - wait for the GPU hardware to go idle
+ * @device: Pointer to the KGSL device structure for the GPU
+ *
+ * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ */
+
+int adreno_idle(struct kgsl_device *device)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	/*
+	 * Make sure the device mutex is held so the dispatcher can't send any
+	 * more commands to the hardware
+	 */
+
+	BUG_ON(!mutex_is_locked(&device->mutex));
+
+	/* Check if we are already idle before idling dispatcher */
+	if (adreno_isidle(device))
+		return 0;
+	/*
+	 * Wait for dispatcher to finish completing commands
+	 * already submitted
+	 */
+	ret = adreno_dispatcher_idle(adreno_dev);
+	if (ret)
+		return ret;
+
+	return adreno_spin_idle(device);
 }
 
 /**
@@ -2819,13 +2892,12 @@ static int adreno_suspend_context(struct kgsl_device *device)
 struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 						phys_addr_t pt_base,
 						unsigned int gpuaddr,
-						unsigned int size,
-						struct kgsl_mem_entry **entry)
+						unsigned int size)
 {
+	struct kgsl_mem_entry *entry;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct adreno_ringbuffer *ringbuffer = &adreno_dev->ringbuffer;
 
-	*entry = NULL;
 	if (kgsl_gpuaddr_in_memdesc(&ringbuffer->buffer_desc, gpuaddr, size))
 		return &ringbuffer->buffer_desc;
 
@@ -2839,33 +2911,20 @@ struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 					size))
 		return &device->mmu.setstate_memory;
 
-	*entry = kgsl_get_mem_entry(device, pt_base, gpuaddr, size);
+	entry = kgsl_get_mem_entry(device, pt_base, gpuaddr, size);
 
-	if (*entry)
-		return &((*entry)->memdesc);
+	if (entry)
+		return &entry->memdesc;
 
 	return NULL;
 }
 
-/*
- * adreno_convertaddr() - Convert a gpu address to kernel mapped address
- * @device: Device on which the address operates
- * @pt_base: The pagetable in which address is mapped
- * @gpuaddr: The start address
- * @size: The length of address range
- * @entry: If the allocation is part of user space allocation then the mem
- * entry is returned in this parameter. Caller is supposed to decrement
- * refcount on this entry after its done using it.
- *
- * Returns the converted host pointer on success else NULL
- */
 uint8_t *adreno_convertaddr(struct kgsl_device *device, phys_addr_t pt_base,
-			    unsigned int gpuaddr, unsigned int size,
-				struct kgsl_mem_entry **entry)
+			    unsigned int gpuaddr, unsigned int size)
 {
 	struct kgsl_memdesc *memdesc;
 
-	memdesc = adreno_find_region(device, pt_base, gpuaddr, size, entry);
+	memdesc = adreno_find_region(device, pt_base, gpuaddr, size);
 
 	return memdesc ? kgsl_gpuaddr_to_vaddr(memdesc, gpuaddr) : NULL;
 }
@@ -2934,7 +2993,7 @@ static void adreno_regwrite(struct kgsl_device *device,
 	if (!in_interrupt())
 		kgsl_pre_hwaccess(device);
 
-	kgsl_trace_regwrite(device, offsetwords, value);
+	trace_kgsl_regwrite(device, offsetwords, value);
 
 	kgsl_cffdump_regwrite(device, offsetwords << 2, value);
 	reg = (unsigned int *)(device->reg_virt + (offsetwords << 2));
@@ -3017,6 +3076,8 @@ static unsigned int adreno_readtimestamp(struct kgsl_device *device,
 			KGSL_MEMSTORE_OFFSET(id, eoptimestamp));
 		break;
 	}
+
+	rmb();
 
 	return timestamp;
 }

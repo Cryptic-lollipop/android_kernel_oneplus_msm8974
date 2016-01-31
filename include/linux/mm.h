@@ -43,15 +43,10 @@ extern int sysctl_legacy_va_layout;
 #define sysctl_legacy_va_layout 0
 #endif
 
-#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-extern const int mmap_rnd_bits_min;
-extern const int mmap_rnd_bits_max;
-extern int mmap_rnd_bits __read_mostly;
-#endif
-#ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
-extern const int mmap_rnd_compat_bits_min;
-extern const int mmap_rnd_compat_bits_max;
-extern int mmap_rnd_compat_bits __read_mostly;
+#ifdef CONFIG_ARCH_MMAP_RND_BITS
+extern int mmap_rnd_bits_min;
+extern int mmap_rnd_bits_max;
+extern int mmap_rnd_bits;
 #endif
 
 #include <asm/page.h>
@@ -1457,37 +1452,6 @@ extern int vm_munmap(unsigned long, size_t);
 extern unsigned long vm_mmap(struct file *, unsigned long,
         unsigned long, unsigned long,
         unsigned long, unsigned long);
-
-struct vm_unmapped_area_info {
-#define VM_UNMAPPED_AREA_TOPDOWN 1
-	unsigned long flags;
-	unsigned long length;
-	unsigned long low_limit;
-	unsigned long high_limit;
-	unsigned long align_mask;
-	unsigned long align_offset;
-};
-
-extern unsigned long unmapped_area(struct vm_unmapped_area_info *info);
-extern unsigned long unmapped_area_topdown(struct vm_unmapped_area_info *info);
-
-/*
- * Search for an unmapped address range.
- *
- * We are looking for a range that:
- * - does not intersect with any VMA;
- * - is contained within the [low_limit, high_limit) interval;
- * - is at least the desired size.
- * - satisfies (begin_addr & align_mask) == (align_offset & align_mask)
- */
-static inline unsigned long
-vm_unmapped_area(struct vm_unmapped_area_info *info)
-{
-	if (!(info->flags & VM_UNMAPPED_AREA_TOPDOWN))
-		return unmapped_area(info);
-	else
-		return unmapped_area_topdown(info);
-}
 
 /* truncate.c */
 extern void truncate_inode_pages(struct address_space *, loff_t);

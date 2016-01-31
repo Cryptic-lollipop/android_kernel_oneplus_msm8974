@@ -22,6 +22,7 @@
 #include <linux/blkdev.h>
 #include <linux/ratelimit.h>
 #include <linux/aio.h>
+#include <linux/blkdev.h>
 #include <asm/pgtable.h>
 
 /*

@@ -45,8 +45,6 @@
 			"Lineout_3 amp", "LINEOUT3",
 			"Lineout_1 amp", "VDD_SPKDRV",
 			"Lineout_3 amp", "VDD_SPKDRV";
-
-		qcom,mbhc-audio-jack-type = "4-pole-jack";
 	};
 };
 
@@ -56,7 +54,5 @@
 		qcom,cdc-vdd-spkdrv-voltage = <4500000 4500000>;
 		qcom,cdc-vdd-spkdrv-current = <1250000>;
 		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv", "cdc-vdd-hpmic-switch";
-
-		qcom,cdc-micbias-cfilt3-mv = <1800>;
 	};
 };

@@ -633,7 +633,12 @@ power_attr(pm_trace_dev_match);
 
 #endif /* CONFIG_PM_TRACE */
 
-static struct attribute * g[] = {
+#ifdef CONFIG_USER_WAKELOCK
+power_attr(wake_lock);
+power_attr(wake_unlock);
+#endif
+
+static struct attribute *g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -669,7 +669,7 @@
 			qcom,cdc-micbias-ldoh-v = <0x3>;
 			qcom,cdc-micbias-cfilt1-mv = <1800>;
 			qcom,cdc-micbias-cfilt2-mv = <2700>;
-			qcom,cdc-micbias-cfilt3-mv = <2700>;
+			qcom,cdc-micbias-cfilt3-mv = <1800>;
 			qcom,cdc-micbias1-cfilt-sel = <0x0>;
 			qcom,cdc-micbias2-cfilt-sel = <0x1>;
 			qcom,cdc-micbias3-cfilt-sel = <0x2>;
@@ -1701,10 +1701,6 @@
 		compatible = "qcom,msm-pcm-loopback";
 	};
 
-	qcom,msm-voice-svc {
-		compatible = "qcom,msm-voice-svc";
-	};
-
 	qcom,msm-dai-q6 {
 		compatible = "qcom,msm-dai-q6";
 		qcom,msm-dai-q6-sb-0-rx {
@@ -2371,22 +2367,6 @@
 
 	qcom,bcl {
 		compatible = "qcom,bcl";
-	};
-
-	i2c@f9928000 { /* BLSP-1 QUP-6 */
-		cell-index = <3>;
-		compatible = "qcom,i2c-qup";
-		reg = <0xf9928000 0x1000>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg-names = "qup_phys_addr";
-		interrupts = <0 100 0>;
-		interrupt-names = "qup_err_intr";
-		qcom,i2c-bus-freq = <400000>;
-		qcom,i2c-src-freq = <19200000>;
-		qcom,scl-gpio = <&msmgpio 30 0>;
-		qcom,sda-gpio = <&msmgpio 29 0>;
-		qcom,master-id = <86>;
 	};
 
 	qcom,ssm {

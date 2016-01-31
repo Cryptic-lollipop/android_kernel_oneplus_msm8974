@@ -10,8 +10,6 @@
  * GNU General Public License for more details.
  */
 
-//#define DEBUG
-
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -862,7 +860,7 @@ static const char *const proxy_rx_ch_text[] = {"One", "Two", "Three", "Four",
 
 static char const *hdmi_rx_sample_rate_text[] = {"KHZ_48", "KHZ_96",
 					"KHZ_192"};
-static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ", "BTSCO_RATE_16KHZ"};
+static const char *const btsco_rate_text[] = {"8000", "16000"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
@@ -1004,10 +1002,10 @@ static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	switch (ucontrol->value.integer.value[0]) {
-	case 0:
+	case 8000:
 		msm_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 1:
+	case 16000:
 		msm_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -1853,11 +1851,7 @@ void *def_taiko_mbhc_cal(void)
 	S(n_btn_meas, 1);
 	S(n_btn_con, 2);
 	S(num_btn, WCD9XXX_MBHC_DEF_BUTTONS);
-#ifdef CONFIG_MACH_OPPO
-	S(v_btn_press_delta_sta, 0);
-#else
 	S(v_btn_press_delta_sta, 100);
-#endif
 	S(v_btn_press_delta_cic, 50);
 #undef S
 	btn_cfg = WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal);
@@ -2680,7 +2674,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_AFE_PCM_RX,
 		.be_hw_params_fixup = msm_proxy_rx_be_hw_params_fixup,
 		/* this dainlink has playback support */
@@ -2695,7 +2688,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_AFE_PCM_TX,
 		.be_hw_params_fixup = msm_proxy_tx_be_hw_params_fixup,
 		.ignore_suspend = 1,
@@ -2768,8 +2760,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_rx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE
-			| ASYNC_DPCM_SND_SOC_HW_PARAMS,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_0_RX,
 		.init = &msm_audrx_init,
 		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
@@ -2785,8 +2775,7 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_tx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE
-			| ASYNC_DPCM_SND_SOC_HW_PARAMS,
+		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_0_TX,
 		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2800,7 +2789,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_rx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_1_RX,
 		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2816,7 +2804,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_tx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_1_TX,
 		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2830,7 +2817,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_rx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_3_RX,
 		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2846,7 +2832,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_tx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_3_TX,
 		.be_hw_params_fixup = msm_slim_0_tx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2860,7 +2845,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name	= "taiko_rx1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_4_RX,
 		.be_hw_params_fixup = msm_slim_0_rx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -2877,7 +2861,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name     = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_INCALL_RECORD_TX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ignore_suspend = 1,
@@ -2891,7 +2874,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name     = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_INCALL_RECORD_RX,
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ignore_suspend = 1,
@@ -2905,7 +2887,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_name = "taiko_codec",
 		.codec_dai_name = "taiko_mad1",
 		.no_pcm = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_5_TX,
 		.be_hw_params_fixup = msm_slim_5_tx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
@@ -3082,7 +3063,6 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	const char *auxpcm_pri_gpio_set = NULL;
 	const char *prop_name_ult_lo_gpio = "qcom,ext-ult-lo-amp-gpio";
 	const char *mbhc_audio_jack_type = NULL;
-	size_t n = strlen("4-pole-jack");
 	struct resource	*pri_muxsel;
 	struct resource	*sec_muxsel;
 
@@ -3151,15 +3131,15 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		mbhc_cfg.enable_anc_mic_detect = false;
 		dev_dbg(&pdev->dev, "Jack type properties set to default");
 	} else {
-		if (!strncmp(mbhc_audio_jack_type, "4-pole-jack", n)) {
+		if (!strcmp(mbhc_audio_jack_type, "4-pole-jack")) {
 			mbhc_cfg.hw_jack_type = FOUR_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = false;
 			dev_dbg(&pdev->dev, "This hardware has 4 pole jack");
-		} else if (!strncmp(mbhc_audio_jack_type, "5-pole-jack", n)) {
+		} else if (!strcmp(mbhc_audio_jack_type, "5-pole-jack")) {
 			mbhc_cfg.hw_jack_type = FIVE_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = true;
 			dev_dbg(&pdev->dev, "This hardware has 5 pole jack");
-		} else if (!strncmp(mbhc_audio_jack_type, "6-pole-jack", n)) {
+		} else if (!strcmp(mbhc_audio_jack_type, "6-pole-jack")) {
 			mbhc_cfg.hw_jack_type = SIX_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = true;
 			dev_dbg(&pdev->dev, "This hardware has 6 pole jack");

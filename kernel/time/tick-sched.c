@@ -301,6 +301,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	if (unlikely(!cpu_online(cpu))) {
 		if (cpu == tick_do_timer_cpu)
 			tick_do_timer_cpu = TICK_DO_TIMER_NONE;
+		return;
 	}
 
 	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE)) {
@@ -934,7 +935,7 @@ void tick_cancel_sched_timer(int cpu)
 		hrtimer_cancel(&ts->sched_timer);
 # endif
 
-	memset(ts, 0, sizeof(*ts));
+	ts->nohz_mode = NOHZ_MODE_INACTIVE;
 }
 #endif
 

@@ -1194,6 +1194,7 @@ static short wcd9xxx_mbhc_setup_hs_polling(struct wcd9xxx_mbhc *mbhc,
 	}
 
 	btn_det = WCD9XXX_MBHC_CAL_BTN_DET_PTR(mbhc->mbhc_cfg->calibration);
+
 	/* Enable external voltage source to micbias if present */
 	if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mb_source)
 		mbhc->mbhc_cb->enable_mb_source(codec, true, true);
@@ -4725,7 +4726,7 @@ static int wcd9xxx_event_notify(struct notifier_block *self, unsigned long val,
 		}
 		if (mbhc->micbias_enable && mbhc->polling_active &&
 		    !(snd_soc_read(mbhc->codec, mbhc->mbhc_bias_regs.ctl_reg)
-		      & 0x80)) {
+	            & 0x80)) {
 			pr_debug("%s:Micbias turned off by recording, set up again",
 				 __func__);
 			snd_soc_update_bits(codec, mbhc->mbhc_bias_regs.ctl_reg,

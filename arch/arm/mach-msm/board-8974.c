@@ -24,7 +24,6 @@
 #include <linux/regulator/krait-regulator.h>
 #include <linux/msm_tsens.h>
 #include <linux/msm_thermal.h>
-#include <linux/ion.h>
 #include <asm/mach/map.h>
 #include <asm/hardware/gic.h>
 #include <asm/mach/map.h>
